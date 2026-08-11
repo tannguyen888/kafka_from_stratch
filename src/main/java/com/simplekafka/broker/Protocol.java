@@ -7,7 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Protocol {
-
+    // stage 1 final variales for request and response types
+    // Broker request types
     public static final byte PRODUCE = 0x01;
     public static final byte FETCH = 0x02;
     public static final byte METADATA = 0x03;
@@ -17,6 +18,27 @@ public class Protocol {
     public static final byte PRODUCE_RESPONSE = 0x11;
     public static final byte FETCH_RESPONSE = 0x12;
     public static final byte ERROR_RESPONSE = 0x13;
+
+    // stage 2
+
+    // buffer.get() to read the first byte of the buffer, which represents the
+    // request type.
+    // Then, based on the request type, it reads the corresponding fields from the
+    // buffer and constructs a Request object.
+
+    // buffer.put() to write the request type and the corresponding fields into a
+    // ByteBuffer.
+    // It then flips the buffer to prepare it for reading and returns it.
+
+    // buffer.getInt() to read an integer value from the buffer, which represents
+    // the offset of the produced message.
+
+    // buffer.getShort() to read a short value from the buffer,
+    // which represents the length of the topic name or the number of messages in a
+    // fetch response.
+
+    // In Byptes -> topic =N; topic.length = 2; regular put = 1 ; partition = 4 ;
+    // offset = 8 ; maxBytes = 4 ; messageLength = 4 ; message = N
 
     public static ByteBuffer encodeProduceRequest(String topic, int partition, byte[] message) {
         ByteBuffer buffer = ByteBuffer.allocate(11 + topic.length() + message.length);
