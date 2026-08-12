@@ -120,4 +120,42 @@ short messageCount = buffer.getShort();
     }
     return new FetchResult(message, "SUCCESS");
 }
+    public static ByteBuffer encodeReplicateRequest(String topic, int partition, long offset, byte[] message) {
+
+        ByteBuffer buffer = ByteBuffer.allocate(17 + topic.length() + message.length);
+        buffer.put(PRODUCE);
+        buffer.putShort((short) topic.length());
+        buffer.put(topic.getBytes());
+        buffer.putInt(partition);
+        buffer.putLong(offset);
+        buffer.putInt(message.length);
+        buffer.put(message);
+        buffer.flip();
+        return buffer;
+    }
+
+    public static ByteBuffer encodeTopicNotification(String topic) {
+
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 2 + topic.length());
+        buffer.put(CREATE_TOPIC);
+        buffer.putShort((short) topic.length());
+        buffer.put(topic.getBytes());
+        buffer.flip();
+        return buffer;
+    }
+
+    public static void sendErrorResponse(SocketChannel channel, String errorMessage) {
+        byte error = buffer.get();
+        if (error != ERROR_RESPONSE) {
+            throw new IllegalArgumentException("Invalid response type: " + error);
+            if (error == ERROR_RESPONSE) {
+                short errorLength = buffer.getShort();
+                byte[] errorMessageBytes = new byte[errorLength];
+                buffer.get(errorMessageBytes);
+                String error = new String(errorMessageBytes);
+                channel.write(ByteBuffer.wrap(errorMessageBytes));
+            }
+        }
+
+    }
 }
