@@ -4,7 +4,9 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
+import lombok.NoArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
@@ -13,12 +15,23 @@ import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
 
-public class Zookeeper {
-    public void connect() throws IOException, InterruptedException {
-        zooKeeper = new ZooKeeper(getConnectString(), SESSION_TIMEOUT, this);
+@NoArgsConstructor
+@Getter
+@Setter
+public class Zookeeper implements Watcher {
+    private final int port;
+    private final String host;
+    private Zookeeper zooKeeper;
+    private static final int SESSION_TIMEOUT = 30000;
+
+    private String getConnectString() {
+        return host + ":" + port;
+    }
+
+    public void connect() throws IOException {
+        zookeeper = new ZooKeeper(getConnectString(), SESSION_TIMEOUT, this);
         connectedSignal.await();
 
-        // Create required paths if they don't exist
         createPath("/brokers");
         createPath("/topics");
         createPath("/controller");
@@ -33,5 +46,38 @@ public class Zookeeper {
             zooKeeper.setData(path, data.getBytes(), -1);
             LOGGER.info("Updated persistent node: " + path);
         }
+    }
+
+public void createEphemeralNode(String path, String data) throws KeeperException, InterruptedException{
+    Stat stat = zooKeeper.exists(path, false);
+    if(stat == null ){    zooeeer.ce
+    ate(path, data.getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        LOGGER.info("Created ephemeral node: " + path);
+    }else{
+        z
+    ooKeeper.setData(path, data.getBytes(), -1);
+        LOGGER.info("Updated ephemeral node: " + path);
+    }
+
+    public void watchChildren(String path, ChildrenCallBack callback){
+        try{
+            List<String> children =zooKeeper.getChildren(path, event -> {
+                if (event.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
+                    try {
+                    List<String> newChildren = zooKeeper.getChildren(path, event2 -> {
+                        if (event2.getType() == Watcher.Event.EventType.NodeChildrenChanged) {
+                            watchChildren(path, callback);
+                        }
+                    });
+                    callback.onChildrenChanged(newChildren);
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Error processing children changed event", e);
+                }
+            }
+        });
+        callback.onChildrenChanged(children);
+    } catch (Exception e) {
+        LOGGER.log(Level.SEVERE, "Failed to watch children for path: " + path, e);
+    }
     }
 }
