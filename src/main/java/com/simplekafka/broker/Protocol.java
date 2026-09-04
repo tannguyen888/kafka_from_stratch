@@ -1,12 +1,12 @@
 package com.simplekafka.broker;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 import java.util.List;
 
-public class Protocol {
+public final class Protocol {
     // stage 1 final variales for request and response types
     // Broker request types
     public static final byte PRODUCE = 0x01;
@@ -96,30 +96,32 @@ public class Protocol {
 
     }
 
-public static FetchResult decodeFetchResponse(ByteBuffer buffer)
-{
-    byte responseType = buffer.get();
-    if(responseType != FETCH_RESPONSE){
-        throw new IllegalArgumentException("Invalid response type: " + responseType);
-        if(reponseType == ERROR_RESPONSE){
+    public static FetchResult decodeFetchResponse(ByteBuffer buffer) {
+        byte responseType = buffer.get();
+
+        if (responseType == ERROR_RESPONSE) {
             short errorLength = buffer.getShort();
             byte[] errorMessage = new byte[errorLength];
             buffer.get(errorMessage);
-            String error = new String (errorMessage);
-            return new FetchResult(byte[0], error);
+            String error = new String(errorMessage, StandardCharsets.UTF_8);
+            return new FetchResult(new byte[0][], error);
         }
-        return new FetchResult(byte[0]  , "Invalid response type: " + responseType);
-    }
-short messageCount = buffer.getShort();
-        byte[][] message = new byte[messageCount][];
-    for(int i =0 ; i < messageCount ; i++){
-        long offset = buffer.getLong();
-         message[i] = new byte[buffer.getInt()];
-        buffer.get(message[i]);
 
+        if (responseType != FETCH_RESPONSE) {
+            return new FetchResult(new byte[0][], "Invalid response type: " + responseType);
+        }
+
+        short messageCount = buffer.getShort();
+        byte[][] messages = new byte[messageCount][];
+        for (int i = 0; i < messageCount; i++) {
+            buffer.getLong();
+            messages[i] = new byte[buffer.getInt()];
+            buffer.get(messages[i]);
+        }
+
+        return new FetchResult(messages, "SUCCESS");
     }
-    return new FetchResult(message, "SUCCESS");
-}
+
     public static ByteBuffer encodeReplicateRequest(String topic, int partition, long offset, byte[] message) {
 
         ByteBuffer buffer = ByteBuffer.allocate(17 + topic.length() + message.length);
@@ -144,18 +146,51 @@ short messageCount = buffer.getShort();
         return buffer;
     }
 
-    public static void sendErrorResponse(SocketChannel channel, String errorMessage) {
-        byte error = buffer.get();
-        if (error != ERROR_RESPONSE) {
-            throw new IllegalArgumentException("Invalid response type: " + error);
-            if (error == ERROR_RESPONSE) {
-                short errorLength = buffer.getShort();
-                byte[] errorMessageBytes = new byte[errorLength];
-                buffer.get(errorMessageBytes);
-                String error = new String(errorMessageBytes);
-                channel.write(ByteBuffer.wrap(errorMessageBytes));
-            }
+    public static void sendErrorResponse(SocketChannel channel, String errorMessage) throws IOException {
+        byte[] errorMessageBytes = errorMessage.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(1 + 2 + errorMessageBytes.length);
+        buffer.put(ERROR_RESPONSE);
+        buffer.putShort((short) errorMessageBytes.length);
+        buffer.put(errorMessageBytes);
+        buffer.flip();
+        while (buffer.hasRemaining()) {
+            channel.write(buffer);
+        }
+    }
+
+    public static final class ProduceResult {
+        private final int offset;
+        private final String status;
+
+        public ProduceResult(int offset, String status) {
+            this.offset = offset;
+            this.status = status;
         }
 
+        public int getOffset() {
+            return offset;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+    }
+
+    public static final class FetchResult {
+        private final byte[][] messages;
+        private final String status;
+
+        public FetchResult(byte[][] messages, String status) {
+            this.messages = messages;
+            this.status = status;
+        }
+
+        public byte[][] getMessages() {
+            return messages;
+        }
+
+        public String getStatus() {
+            return status;
+        }
     }
 }
